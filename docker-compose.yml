@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bodega_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bodega_user
+      POSTGRES_PASSWORD: bodega_pass
+      POSTGRES_DB: bodega_pos
+    ports:
+      - "5432:5432"
+    volumes:
+      - bodega_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bodega_user -d bodega_pos"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: bodega_backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: bodega_user
+      DB_PASSWORD: bodega_pass
+      DB_NAME: bodega_pos
+      PORT: 4000
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  bodega_data:
